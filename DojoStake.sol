@@ -9,8 +9,8 @@ contract DojoStake is Staking20Base {
     uint256 public withdrawFee;
     address public withdrawFeeRecipient;
 
-    // Mapping to track total staked amount for each user
-    mapping(address => uint256) public totalStaked;
+    // Mapping to track total staked amount for each user and staking token
+    mapping(address => mapping(address => uint256)) public totalStakedByToken;
 
     constructor(
         uint80 _timeUnit,
@@ -50,8 +50,8 @@ contract DojoStake is Staking20Base {
 
         if (withdrawFee > 0) {
             // Calculate the fee on the staked amount
-            uint256 feeAmount = (totalStaked[_staker] * withdrawFee) / 10000;
-            uint256 actualStakedAmount = totalStaked[_staker] - feeAmount;
+            uint256 feeAmount = (totalStakedByToken[stakingTokenAddress][_staker] * withdrawFee) / 10000;
+            uint256 actualStakedAmount = totalStakedByToken[stakingTokenAddress][_staker] - feeAmount;
 
             // Transfer the actual staked amount to the staker
             require(IERC20(stakingTokenAddress).transfer(_staker, actualStakedAmount), "Staked amount transfer failed");
@@ -63,13 +63,13 @@ contract DojoStake is Staking20Base {
             require(IERC20(rewardTokenAddress).transfer(_staker, _rewards), "Reward transfer failed");
         } else {
             // If no withdraw fee, simply transfer the staked amount and rewards to the staker
-            require(IERC20(stakingTokenAddress).transfer(_staker, totalStaked[_staker]), "Staked amount transfer failed");
+            require(IERC20(stakingTokenAddress).transfer(_staker, totalStakedByToken[stakingTokenAddress][_staker]), "Staked amount transfer failed");
 
             // Mint or transfer reward tokens to the staker
             require(IERC20(rewardTokenAddress).transfer(_staker, _rewards), "Reward transfer failed");
         }
 
-        // Reset the staked amount for the user
-        totalStaked[_staker] = 0;
+        // Reset the staked amount for the user and staking token
+        totalStakedByToken[stakingTokenAddress][_staker] = 0;
     }
 }
