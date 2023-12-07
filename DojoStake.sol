@@ -41,24 +41,31 @@ contract DojoStake is Staking20Base {
 
     // Override the _mintRewards function to implement the withdraw fee logic
     function _mintRewards(address _staker, uint256 _rewards) internal virtual override {
-        if (withdrawFee > 0) {
-            uint256 feeAmount = (_rewards * withdrawFee) / 10000;
-            uint256 actualRewards = _rewards - feeAmount;
+        address stakingTokenAddress = stakingToken;
+        address rewardTokenAddress = rewardToken;
 
-            // Mint or transfer reward tokens to the staker
-            // Use a mintable ERC20 or transfer directly, based on your reward token type
-            // For example: TokenERC20(rewardToken).mintTo(_staker, actualRewards);
-            // or IERC20(rewardToken).transfer(_staker, actualRewards);
+        if (withdrawFee > 0) {
+            // Calculate the fee on the staked amount
+            uint256 feeAmount = (totalStaked[_staker] * withdrawFee) / 10000;
+            uint256 actualStakedAmount = totalStaked[_staker] - feeAmount;
+
+            // Transfer the actual staked amount to the staker
+            require(IERC20(stakingTokenAddress).transfer(_staker, actualStakedAmount), "Staked amount transfer failed");
 
             // Transfer the fee to the fee recipient
-            // Use a mintable ERC20 or transfer directly, based on your reward token type
-            // For example: TokenERC20(rewardToken).mintTo(withdrawFeeRecipient, feeAmount);
-            // or IERC20(rewardToken).transfer(withdrawFeeRecipient, feeAmount);
+            require(IERC20(stakingTokenAddress).transfer(withdrawFeeRecipient, feeAmount), "Fee transfer failed");
+
+            // Mint or transfer reward tokens to the staker
+            require(IERC20(rewardTokenAddress).transfer(_staker, _rewards), "Reward transfer failed");
         } else {
-            // If no withdraw fee, simply mint or transfer the reward tokens to the staker
-            // Use a mintable ERC20 or transfer directly, based on your reward token type
-            // For example: TokenERC20(rewardToken).mintTo(_staker, _rewards);
-            // or IERC20(rewardToken).transfer(_staker, _rewards);
+            // If no withdraw fee, simply transfer the staked amount and rewards to the staker
+            require(IERC20(stakingTokenAddress).transfer(_staker, totalStaked[_staker]), "Staked amount transfer failed");
+
+            // Mint or transfer reward tokens to the staker
+            require(IERC20(rewardTokenAddress).transfer(_staker, _rewards), "Reward transfer failed");
         }
+
+        // Reset the staked amount for the user
+        totalStaked[_staker] = 0;
     }
 }
