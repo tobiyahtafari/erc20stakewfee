@@ -8,6 +8,9 @@ contract DojoStake is Staking20Base {
     uint256 public withdrawFee;
     address public withdrawFeeRecipient;
 
+    // Mapping to track total staked amount for each user
+    mapping(address => uint256) public totalStaked;
+
     constructor(
         uint80 _timeUnit,
         uint256 _rewardRatioNumerator,
