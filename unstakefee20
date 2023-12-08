@@ -2,9 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "@thirdweb-dev/contracts/base/Staking20Base.sol";
-import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";  // Import the IERC20 interface
+import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol"; // Import ReentrancyGuard
 
-contract DojoStake is Staking20Base {
+contract DojoStake is Staking20Base, ReentrancyGuard {
     using SafeMath for uint256;
 
     // Withdraw Fee and Fee Recipient
@@ -18,10 +19,19 @@ contract DojoStake is Staking20Base {
     mapping(address => uint256) public stakedBalance;
 
     // Event emitters
-    event Withdrawal(address indexed staker, uint256 amount);
+    event Withdrawal(
+        address indexed staker,
+        uint256 stakedBeforeWithdrawal,
+        uint256 actualUnstakedAmount,
+        uint256 feeAmount,
+        uint256 stakedAfterWithdrawal
+    );
     event FeePaid(address indexed staker, uint256 feeAmount);
     event RewardsMinted(address indexed staker, uint256 rewards);
 
+    /**
+     * @dev Contract constructor.
+     */
     constructor(
         uint80 _timeUnit,
         uint256 _rewardRatioNumerator,
@@ -46,8 +56,11 @@ contract DojoStake is Staking20Base {
         withdrawFeeRecipient = _withdrawFeeRecipient;
     }
 
-    // Function to unstake with withdraw fee
-    function unstakeWithFee(uint256 _amount) external {
+    /**
+     * @dev Function to unstake with withdraw fee.
+     * @param _amount Amount to unstake.
+     */
+    function unstakeWithFee(uint256 _amount) external nonReentrant {
         require(_amount > 0, "Amount must be greater than 0");
         require(stakedBalance[msg.sender] >= _amount, "Insufficient staked balance");
 
@@ -55,16 +68,20 @@ contract DojoStake is Staking20Base {
         uint256 feeAmount = _amount.mul(withdrawFee).div(10000);
         uint256 actualUnstakedAmount = _amount.sub(feeAmount);
 
+        // Record staker's balance before and after withdrawal
+        uint256 stakedBefore = stakedBalance[msg.sender];
+        uint256 stakedAfter = stakedBefore.sub(_amount);
+
         // Transfer the actual unstaked amount to the staker
         require(IERC20(stakingToken).transfer(msg.sender, actualUnstakedAmount), "Unstaked amount transfer failed");
-        emit Withdrawal(msg.sender, actualUnstakedAmount);
+        emit Withdrawal(msg.sender, stakedBefore, actualUnstakedAmount, feeAmount, stakedAfter);
 
         // Transfer the fee to the fee recipient
         require(IERC20(stakingToken).transfer(withdrawFeeRecipient, feeAmount), "Fee transfer failed");
         emit FeePaid(msg.sender, feeAmount);
 
         // Update staked balances
-        stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(_amount);
+        stakedBalance[msg.sender] = stakedAfter;
 
         // Mint or transfer reward tokens to the staker
         _mintRewards(msg.sender, _calculateRewards(msg.sender));
@@ -72,15 +89,23 @@ contract DojoStake is Staking20Base {
         emit RewardsMinted(msg.sender, _calculateRewards(msg.sender));
     }
 
-    // Function to calculate rewards
-    function _calculateRewards(address _staker) internal view override returns (uint256) {
+    /**
+     * @dev Function to calculate rewards.
+     * @param _staker Address of the staker.
+     * @return _rewards Calculated rewards.
+     */
+    function _calculateRewards(address _staker) internal view override returns (uint256 _rewards) {
         // Your logic to calculate rewards goes here
         // For example, you can use time-based rewards or any other mechanism
         // Return the calculated rewards
         return 0;
     }
 
-    // Function to mint rewards
+    /**
+     * @dev Function to mint rewards.
+     * @param _staker Address of the staker.
+     * @param _rewards Amount of rewards to mint.
+     */
     function _mintRewards(address _staker, uint256 _rewards) internal override {
         // Your logic to mint or transfer rewards goes here
         // For example, you can mint ERC20 rewards or transfer them from a reward pool
