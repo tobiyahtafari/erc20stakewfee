@@ -29,20 +29,19 @@ contract DojoStake is Staking20Base {
         address _withdrawFeeRecipient
     )
         Staking20Base(
-    _timeUnit,
-    msg.sender, // Set the deployer's address as the default owner
-    _rewardRatioNumerator,
-    _rewardRatioDenominator,
-    _stakingToken,
-    _rewardToken,
-    _withdrawFee,
-    _withdrawFeeRecipient
-)
+            _timeUnit,
+            msg.sender, // Set the deployer's address as the default owner
+            _rewardRatioNumerator,
+            _rewardRatioDenominator,
+            _stakingToken,
+            _rewardToken,
+            _withdrawFee,
+            _withdrawFeeRecipient
+        )
     {
         // Set withdrawFee and withdrawFeeRecipient during initialization
-withdrawFee = _withdrawFee;
-withdrawFeeRecipient = _withdrawFeeRecipient;
-
+        withdrawFee = _withdrawFee;
+        withdrawFeeRecipient = _withdrawFeeRecipient;
     }
 
     function initializeWithdrawFeeRecipient(address _withdrawFeeRecipient) external onlyOwner {
