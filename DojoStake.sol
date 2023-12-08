@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@thirdweb-dev/contracts/base/Staking20Base.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";  // Import the IERC20 interface
+import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";  // Import the IERC20 interface
 
 contract DojoStake is Staking20Base {
     using SafeMath for uint256;
