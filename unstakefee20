@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@thirdweb-dev/contracts/base/Staking20Base.sol";
+import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";  // Import the IERC20 interface
+
+contract DojoStake is Staking20Base {
+    using SafeMath for uint256;
+
+    // Withdraw Fee and Fee Recipient
+    uint256 public withdrawFee;
+    address public withdrawFeeRecipient;
+
+    // Mapping to track total staked amount for each user
+    mapping(address => uint256) public totalStakedByUser;
+
+    // Event emitters
+    event Withdrawal(address indexed staker, uint256 amount);
+    event FeePaid(address indexed staker, uint256 feeAmount);
+    event RewardsMinted(address indexed staker, uint256 rewards);
+
+    constructor(
+        uint80 _timeUnit,
+        uint256 _rewardRatioNumerator,
+        uint256 _rewardRatioDenominator,
+        address _stakingToken,
+        address _rewardToken,
+        uint256 _withdrawFee,
+        address _withdrawFeeRecipient
+    )
+        Staking20Base(
+            _timeUnit,
+            msg.sender, // Set the deployer's address as the default owner
+            _rewardRatioNumerator,
+            _rewardRatioDenominator,
+            _stakingToken,
+            _rewardToken,
+            0, // Placeholder for _withdrawFee in the base constructor
+            _withdrawFeeRecipient
+        )
+    {
+        // Set withdrawFee and withdrawFeeRecipient during initialization
+        withdrawFee = _withdrawFee;
+        withdrawFeeRecipient = _withdrawFeeRecipient;
+    }
+
+    // Function to unstake with withdraw fee
+    function unstakeWithFee(uint256 _amount) external {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(stakedBalance[msg.sender] >= _amount, "Insufficient staked balance");
+
+        // Calculate the fee on the unstaked amount using SafeMath
+        uint256 feeAmount = _amount.mul(withdrawFee).div(10000);
+        uint256 actualUnstakedAmount = _amount.sub(feeAmount);
+
+        // Transfer the actual unstaked amount to the staker
+        require(IERC20(stakingToken).transfer(msg.sender, actualUnstakedAmount), "Unstaked amount transfer failed");
+        emit Withdrawal(msg.sender, actualUnstakedAmount);
+
+        // Transfer the fee to the fee recipient
+        require(IERC20(stakingToken).transfer(withdrawFeeRecipient, feeAmount), "Fee transfer failed");
+        emit FeePaid(msg.sender, feeAmount);
+
+        // Update staked balances
+        stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(_amount);
+
+        // Mint or transfer reward tokens to the staker
+        _mintRewards(msg.sender, calculateRewards(msg.sender));
+
+        emit RewardsMinted(msg.sender, calculateRewards(msg.sender));
+    }
+}
