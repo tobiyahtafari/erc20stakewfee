@@ -14,6 +14,9 @@ contract DojoStake is Staking20Base {
     // Mapping to track total staked amount for each user
     mapping(address => uint256) public totalStakedByUser;
 
+    // Mapping to track staked balance for each user
+    mapping(address => uint256) public stakedBalance;
+
     // Event emitters
     event Withdrawal(address indexed staker, uint256 amount);
     event FeePaid(address indexed staker, uint256 feeAmount);
@@ -30,12 +33,11 @@ contract DojoStake is Staking20Base {
     )
         Staking20Base(
             _timeUnit,
-            msg.sender, // Set the deployer's address as the default owner
+            _rewardToken,
             _rewardRatioNumerator,
             _rewardRatioDenominator,
             _stakingToken,
-            _rewardToken,
-            0, // Placeholder for _withdrawFee in the base constructor
+            msg.sender, // Set the deployer's address as the default owner
             _withdrawFeeRecipient
         )
     {
@@ -65,8 +67,24 @@ contract DojoStake is Staking20Base {
         stakedBalance[msg.sender] = stakedBalance[msg.sender].sub(_amount);
 
         // Mint or transfer reward tokens to the staker
-        _mintRewards(msg.sender, calculateRewards(msg.sender));
+        _mintRewards(msg.sender, _calculateRewards(msg.sender));
 
-        emit RewardsMinted(msg.sender, calculateRewards(msg.sender));
+        emit RewardsMinted(msg.sender, _calculateRewards(msg.sender));
+    }
+
+    // Function to calculate rewards
+    function _calculateRewards(address _staker) internal view override returns (uint256) {
+        // Your logic to calculate rewards goes here
+        // For example, you can use time-based rewards or any other mechanism
+        // Return the calculated rewards
+        return 0;
+    }
+
+    // Function to mint rewards
+    function _mintRewards(address _staker, uint256 _rewards) internal override {
+        // Your logic to mint or transfer rewards goes here
+        // For example, you can mint ERC20 rewards or transfer them from a reward pool
+        // Emit an event to log the rewards
+        emit RewardsMinted(_staker, _rewards);
     }
 }
