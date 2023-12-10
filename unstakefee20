@@ -2,114 +2,53 @@
 pragma solidity ^0.8.0;
 
 import "@thirdweb-dev/contracts/base/Staking20Base.sol";
-import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol"; // Import ReentrancyGuard
+import "@thirdweb-dev/contracts/token/TokenERC20.sol";
 
-contract DojoStake is Staking20Base, ReentrancyGuard {
-    using SafeMath for uint256;
+contract StakingContract is Staking20Base {
+    uint256 private constant UNSTAKE_FEE_PERCENTAGE = 30;
+    address private unstakeFeeRecipient;
 
-    // Withdraw Fee and Fee Recipient
-    uint256 public withdrawFee;
-    address public withdrawFeeRecipient;
-
-    // Mapping to track total staked amount for each user
-    mapping(address => uint256) public totalStakedByUser;
-
-    // Mapping to track staked balance for each user
-    mapping(address => uint256) public stakedBalance;
-
-    // Event emitters
-    event Withdrawal(
-        address indexed staker,
-        uint256 stakedBeforeWithdrawal,
-        uint256 actualUnstakedAmount,
-        uint256 feeAmount,
-        uint256 stakedAfterWithdrawal
-    );
-    event FeePaid(address indexed staker, uint256 feeAmount);
-    event RewardsMinted(address indexed staker, uint256 rewards);
-
-    /**
-     * @dev Contract constructor.
-     */
     constructor(
-        uint80 _timeUnit,
+        uint256 _timeUnit,
         uint256 _rewardRatioNumerator,
         uint256 _rewardRatioDenominator,
         address _stakingToken,
         address _rewardToken,
-        uint256 _withdrawFee,
-        address _withdrawFeeRecipient
-    )
-        Staking20Base(
-            _timeUnit,
-            _rewardToken,
-            _rewardRatioNumerator,
-            _rewardRatioDenominator,
-            _stakingToken,
-            msg.sender, // Set the deployer's address as the default owner
-            _withdrawFeeRecipient
-        )
-    {
-        // Set withdrawFee and withdrawFeeRecipient during initialization
-        withdrawFee = _withdrawFee;
-        withdrawFeeRecipient = _withdrawFeeRecipient;
+        address _nativeTokenWrapper,
+        address _unstakeFeeRecipient
+    ) Staking20Base(
+        _timeUnit,
+        _rewardRatioNumerator,
+        _rewardRatioDenominator,
+        _stakingToken,
+        _rewardToken,
+        _nativeTokenWrapper
+    ) {
+        unstakeFeeRecipient = _unstakeFeeRecipient;
     }
 
-    /**
-     * @dev Function to unstake with withdraw fee.
-     * @param _amount Amount to unstake.
-     */
-    function unstakeWithFee(uint256 _amount) external nonReentrant {
-        require(_amount > 0, "Amount must be greater than 0");
-        require(stakedBalance[msg.sender] >= _amount, "Insufficient staked balance");
+    function unstake(uint256 _amount, bytes memory _data) external payable override {
+        require(_amount > 0, "Invalid unstake amount");
 
-        // Calculate the fee on the unstaked amount using SafeMath
-        uint256 feeAmount = _amount.mul(withdrawFee).div(10000);
-        uint256 actualUnstakedAmount = _amount.sub(feeAmount);
+        uint256 stakedAmount = stakedBalances[_msgSender()];
+        require(stakedAmount >= _amount, "Insufficient staked amount");
 
-        // Record staker's balance before and after withdrawal
-        uint256 stakedBefore = stakedBalance[msg.sender];
-        uint256 stakedAfter = stakedBefore.sub(_amount);
+        uint256 withdrawalFee = (_amount * UNSTAKE_FEE_PERCENTAGE) / 100;
+        uint256 unstakeAmountAfterFee = _amount - withdrawalFee;
 
-        // Transfer the actual unstaked amount to the staker
-        require(IERC20(stakingToken).transfer(msg.sender, actualUnstakedAmount), "Unstaked amount transfer failed");
-        emit Withdrawal(msg.sender, stakedBefore, actualUnstakedAmount, feeAmount, stakedAfter);
+        stakedBalances[_msgSender()] -= _amount;
+        stakingTokenBalance -= unstakeAmountAfterFee;
 
-        // Transfer the fee to the fee recipient
-        require(IERC20(stakingToken).transfer(withdrawFeeRecipient, feeAmount), "Fee transfer failed");
-        emit FeePaid(msg.sender, feeAmount);
+        TokenERC20(stakingToken).transfer(_msgSender(), unstakeAmountAfterFee);
 
-        // Update staked balances
-        stakedBalance[msg.sender] = stakedAfter;
+        if (withdrawalFee > 0) {
+            TokenERC20(stakingToken).transfer(unstakeFeeRecipient, withdrawalFee);
+        }
 
-        // Mint or transfer reward tokens to the staker
-        _mintRewards(msg.sender, _calculateRewards(msg.sender));
-
-        emit RewardsMinted(msg.sender, _calculateRewards(msg.sender));
+        emit Unstaked(_msgSender(), unstakeAmountAfterFee, _data);
     }
 
-    /**
-     * @dev Function to calculate rewards.
-     * @param _staker Address of the staker.
-     * @return _rewards Calculated rewards.
-     */
-    function _calculateRewards(address _staker) internal view override returns (uint256 _rewards) {
-        // Your logic to calculate rewards goes here
-        // For example, you can use time-based rewards or any other mechanism
-        // Return the calculated rewards
-        return 0;
-    }
-
-    /**
-     * @dev Function to mint rewards.
-     * @param _staker Address of the staker.
-     * @param _rewards Amount of rewards to mint.
-     */
     function _mintRewards(address _staker, uint256 _rewards) internal override {
-        // Your logic to mint or transfer rewards goes here
-        // For example, you can mint ERC20 rewards or transfer them from a reward pool
-        // Emit an event to log the rewards
-        emit RewardsMinted(_staker, _rewards);
+        TokenERC20(rewardToken).mintTo(_staker, _rewards);
     }
 }
