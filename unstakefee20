@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@thirdweb-dev/contracts/base/Staking20Base.sol";
 import "@thirdweb-dev/contracts/token/TokenERC20.sol";
 
-contract StakingContract is Staking20Base {
+contract DojoStake is Staking20Base {
     uint256 private constant UNSTAKE_FEE_PERCENTAGE = 30;
     address private unstakeFeeRecipient;
 
